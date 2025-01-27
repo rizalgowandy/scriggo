@@ -28,31 +28,30 @@ type Time struct {
 	t time.Time
 }
 
-// NewTime returns a Time value at the time of t. It is not intended to be
+// NewTime returns a [Time] value at the time of t. It is not intended to be
 // used as a builtin but it can be used to implement builtins that return time
 // values.
 //
 // For example, a builtin that returns the current local time rounded to
 // milliseconds and with location "America/New_York" can be implemented as
 //
-//    func now() builtin.Time {
-//        l := time.LoadLocation("America/New_York")
-//        t := time.Now().Rounded(time.Millisecond).In(l)
-//        return builtin.NewTime(t)
-//    }
+//	func now() builtin.Time {
+//	    l := time.LoadLocation("America/New_York")
+//	    t := time.Now().Rounded(time.Millisecond).In(l)
+//	    return builtin.NewTime(t)
+//	}
 //
 // and once added to the declarations
 //
-//    native.Declarations{
-//        ...
-//        "now" : now,
-//        ...
-//    }
+//	native.Declarations{
+//	    ...
+//	    "now" : now,
+//	    ...
+//	}
 //
 // it can be used in a template
 //
-//    Current time: {{ now() }}
-//
+//	Current time: {{ now() }}
 func NewTime(t time.Time) Time {
 	return Time{t}
 }
@@ -107,7 +106,9 @@ func (t Time) Equal(u Time) bool {
 // Format returns a textual representation of the time value formatted
 // according to layout, which defines the format by showing how the reference
 // time
+//
 //	Mon Jan 2 15:04:05 -0700 MST 2006
+//
 // would be displayed if it were the value; it serves as an example of the
 // desired output. The same display rules will then be applied to the time
 // value.
@@ -239,7 +240,7 @@ func (t Time) Unix() int64 {
 // January 1, 1970 UTC. The result is undefined if the Unix time in
 // nanoseconds cannot be represented by an int64 (a date before the year 1678
 // or after 2262). Note that this means the result of calling UnixNano on the
-// zero Time is undefined. The result does not depend on the location
+// zero [Time] is undefined. The result does not depend on the location
 // associated with t.
 func (t Time) UnixNano() int64 {
 	return t.t.UnixNano()

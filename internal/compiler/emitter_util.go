@@ -88,13 +88,12 @@ func (em *emitter) _changeRegister(k bool, src, dst int8, srcType reflect.Type, 
 // comparisonWithZeroInteger returns the non-constant integer expression if
 // cond is a binary operator expression with one of the following forms:
 //
-//    expr == 0
-//    0    == expr
-//    expr != 0
-//    0    != expr
+//	expr == 0
+//	0    == expr
+//	expr != 0
+//	0    != expr
 //
 // If the previous condition does not apply, nil is returned.
-//
 func (em *emitter) comparisonWithZeroInteger(cond *ast.BinaryOperator) ast.Expression {
 
 	// The operator must be a comparison between a constant and a non-constant
@@ -262,7 +261,7 @@ func canEmitDirectly(k1, k2 reflect.Kind) bool {
 }
 
 // setFunctionVarRefs sets the var refs of a function.
-// This method operates on the current function builder, so shall be called
+// This method operates on the current function builder, so must be called
 // before changing or saving it.
 func (em *emitter) setFunctionVarRefs(fn *runtime.Function, closureVars []ast.Upvar) {
 	refs := make([]int16, len(closureVars))
@@ -275,7 +274,7 @@ func (em *emitter) setFunctionVarRefs(fn *runtime.Function, closureVars []ast.Up
 			continue
 		}
 		em.varStore.setClosureVar(fn, v.Declaration.(*ast.Identifier).Name, int16(i))
-		// v is a variable declared in function.
+		// v is a variable declared in a function.
 		ident := v.Declaration.(*ast.Identifier)
 		if em.fb.declaredInFunc(ident.Name) {
 			refs[i] = int16(em.fb.scopeLookup(ident.Name))

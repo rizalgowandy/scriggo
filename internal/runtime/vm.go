@@ -31,7 +31,7 @@ var emptyInterfaceType = reflect.TypeOf(&[]interface{}{nil}[0]).Elem()
 var emptyInterfaceNil = reflect.ValueOf(&[]interface{}{nil}[0]).Elem()
 
 // Converter is implemented by format converters.
-type Converter func(src []byte, out io.Writer) error
+type Converter = func(src []byte, out io.Writer) error
 
 // A TypeOfFunc function returns a type of a value.
 type TypeOfFunc func(reflect.Value) reflect.Type
@@ -190,7 +190,8 @@ func (vm *VM) SetContext(ctx context.Context) {
 //
 // SetRenderer must not be called after vm has been started.
 func (vm *VM) SetRenderer(out io.Writer, conv Converter) {
-	vm.renderer = newRenderer(vm.env, out, conv)
+	vm.renderer = newRenderer(out)
+	vm.env.conv = conv
 }
 
 // SetPrint sets the "print" builtin function.
@@ -239,8 +240,8 @@ func (vm *VM) Stack(buf []byte, all bool) int {
 			write("???")
 		}
 		write(":")
-		if debugInfo, ok := fn.DebugInfo[ppc]; ok {
-			write(strconv.Itoa(debugInfo.Position.Line))
+		if info, ok := fn.InstructionInfo[ppc]; ok {
+			write(strconv.Itoa(info.Position.Line))
 		} else {
 			write("???")
 		}
@@ -339,7 +340,7 @@ func (vm *VM) callNative(fn *NativeFunction, numVariadic int8, shift StackShift,
 					if vm.main {
 						env := vm.env
 						env.mu.Lock()
-						env.callPath = vm.fn.DebugInfo[vm.pc-1].Path
+						env.callPath = vm.fn.InstructionInfo[vm.pc-1].Path
 						env.mu.Unlock()
 					}
 					args[i].Set(vm.envArg)
@@ -371,7 +372,7 @@ func (vm *VM) callNative(fn *NativeFunction, numVariadic int8, shift StackShift,
 				case reflect.Func:
 					for j := 0; j < int(numVariadic); j++ {
 						f := vm.general(int8(j + 1)).Interface().(*callable)
-						slice.Index(j).Set(f.Value(vm.renderer, vm.env))
+						slice.Index(j).Set(f.Value(vm.env))
 					}
 				case reflect.String:
 					for j := 0; j < int(numVariadic); j++ {
@@ -733,12 +734,6 @@ type Registers struct {
 	General []reflect.Value
 }
 
-// macroOutBuffer is used in CallMacro and CallIndirect instructions to buffer
-// the out of a macro call and convert it to a string in Return instructions.
-type macroOutBuffer struct {
-	strings.Builder
-}
-
 type NativeFunction struct {
 	pkg         string        // package.
 	name        string        // name.
@@ -808,13 +803,28 @@ func (fn *NativeFunction) Func() interface{} {
 
 // Function represents a function.
 type Function struct {
-	Pkg             string
-	Name            string
-	File            string
-	Pos             *Position // position of the function declaration.
-	Type            reflect.Type
-	Parent          *Function
-	VarRefs         []int16
+	Pkg    string
+	Name   string
+	File   string
+	Pos    *Position // position of the function declaration.
+	Type   reflect.Type
+	Parent *Function
+
+	// VarRefs refers to the non-local variables referenced in this function.
+	//
+	// If VarRefs is nil, it means that the non-local variables are the global
+	// variables passed through the env.
+	//
+	// Otherwise, for each var Ref in VarRefs:
+	//
+	// * if Ref >= 0, Ref refers to the non-local variable at index Ref of the
+	//   currently executing function
+	//
+	// * if Ref < 0, it refers to the general register -Ref of the currently
+	//   executing function, which will contain the value of that variable
+	//   (indirectly).
+	VarRefs []int16
+
 	Types           []reflect.Type
 	NumReg          [4]int8
 	FinalRegs       [][2]int8 // [indirect -> return parameter registers]
@@ -826,7 +836,7 @@ type Function struct {
 	NativeFunctions []*NativeFunction
 	Body            []Instruction
 	Text            [][]byte
-	DebugInfo       map[Addr]DebugInfo
+	InstructionInfo map[Addr]InstructionInfo
 }
 
 // Position represents a source position.
@@ -841,9 +851,9 @@ func (p Position) String() string {
 	return strconv.Itoa(p.Line) + ":" + strconv.Itoa(p.Column)
 }
 
-// DebugInfo represents a set of debug information associated to a given
+// InstructionInfo represents a set of information associated to a given
 // instruction. None of the fields below is mandatory.
-type DebugInfo struct {
+type InstructionInfo struct {
 	Position    Position        // position of the instruction in the source code.
 	Path        string          // path of the source code where the instruction is located in.
 	OperandKind [3]reflect.Kind // kind of operands A, B and C.
@@ -889,9 +899,9 @@ func (c *callable) Native() *NativeFunction {
 	return c.native
 }
 
-// Value returns a reflect Value of a callable, so it can be called from a
+// Value returns a reflect.Value of a callable, so it can be called from a
 // native code and passed to a native code.
-func (c *callable) Value(renderer *renderer, env *env) reflect.Value {
+func (c *callable) Value(env *env) reflect.Value {
 	if c.value.IsValid() {
 		return c.value
 	}
@@ -906,9 +916,8 @@ func (c *callable) Value(renderer *renderer, env *env) reflect.Value {
 	c.value = reflect.MakeFunc(fn.Type, func(args []reflect.Value) []reflect.Value {
 		nvm := create(env)
 		if fn.Macro {
-			renderer = renderer.WithOut(&macroOutBuffer{})
+			nvm.renderer = newRenderer(&strings.Builder{})
 		}
-		nvm.renderer = renderer
 		nOut := fn.Type.NumOut()
 		results := make([]reflect.Value, nOut)
 		var r = [4]int8{1, 1, 1, 1}
@@ -942,12 +951,8 @@ func (c *callable) Value(renderer *renderer, env *env) reflect.Value {
 			panic(err)
 		}
 		if fn.Macro {
-			b := renderer.Out().(*macroOutBuffer)
+			b := nvm.renderer.Out().(*strings.Builder)
 			nvm.setString(1, b.String())
-			err := renderer.Close()
-			if err != nil {
-				panic(&fatalError{env: env, msg: err})
-			}
 		}
 		r = [4]int8{1, 1, 1, 1}
 		for _, result := range results {
@@ -1131,6 +1136,7 @@ const (
 	OpMakeStruct
 
 	OpMapIndex
+	OpMapIndexAny
 
 	OpMethodValue
 

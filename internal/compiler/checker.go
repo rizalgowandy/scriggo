@@ -20,11 +20,10 @@ import (
 type checkingMod int
 
 // Converter is implemented by format converters.
-type Converter func(src []byte, out io.Writer) error
+type Converter = func(src []byte, out io.Writer) error
 
 const (
 	programMod checkingMod = iota + 1
-	scriptMod
 	templateMod
 )
 
@@ -51,7 +50,7 @@ func typecheck(tree *ast.Tree, importer native.Importer, opts checkerOptions) (m
 		return compilation.pkgInfos, nil
 	}
 
-	// Prepare the type checking for scripts and templates.
+	// Prepare the type checking for templates.
 	var globalScope map[string]scopeName
 	if opts.globals != nil {
 		globals := native.Package{
@@ -59,16 +58,6 @@ func typecheck(tree *ast.Tree, importer native.Importer, opts checkerOptions) (m
 			Declarations: opts.globals,
 		}
 		globalScope = toTypeCheckerScope(globals, opts.mod, true, 0)
-	}
-
-	// Add the global "exit" to script global scope.
-	if opts.mod == scriptMod {
-		exit := scopeName{ti: &typeInfo{Properties: propertyUniverse}}
-		if globalScope == nil {
-			globalScope = map[string]scopeName{"exit": exit}
-		} else if _, ok := globalScope["exit"]; !ok {
-			globalScope["exit"] = exit
-		}
 	}
 
 	compilation := newCompilation(globalScope)
@@ -98,7 +87,7 @@ func typecheck(tree *ast.Tree, importer native.Importer, opts checkerOptions) (m
 		tc.path = extends.Tree.Path
 	}
 
-	// Type check a template file or a script.
+	// Type check a template file.
 	var err error
 	tree.Nodes, err = tc.checkNodesInNewScopeError(tree, tree.Nodes)
 	if err != nil {
@@ -154,7 +143,7 @@ type typechecker struct {
 	// terminating reports whether current statement is terminating. In a
 	// context other than ContextGo, the type checker does not check the
 	// termination so the value of terminating is not significant. For
-	// further details see https://golang.org/ref/spec#Terminating_statements.
+	// further details see https://go.dev/ref/spec#Terminating_statements.
 	terminating bool
 
 	// hasBreak reports whether a given statement node has a 'break' that refers
@@ -217,7 +206,7 @@ type usingCheck struct {
 }
 
 // newTypechecker creates a new type checker. A global scope may be provided
-// for scripts and templates.
+// for templates.
 func newTypechecker(compilation *compilation, path string, opts checkerOptions, importer native.Importer) *typechecker {
 	tt := types.NewTypes()
 	tc := typechecker{
@@ -315,16 +304,16 @@ func (tc *typechecker) programImportError(imp *ast.Import) error {
 //
 // For example, given the source code:
 //
-// 		func f() {
-// 			A := 10
-// 			func g() {
-// 				func h() {
-// 					_ = A
-// 				}
-// 			}
-// 		}
-// calling getNestedFuncs("A") returns [G, H].
+//	func f() {
+//		A := 10
+//		func g() {
+//			func h() {
+//				_ = A
+//			}
+//		}
+//	}
 //
+// calling getNestedFuncs("A") returns [G, H].
 func (tc *typechecker) getNestedFuncs(name string) []*ast.Func {
 	var fun *ast.Func
 	_, _, ok := tc.scopes.LookupInFunc(name)
@@ -353,10 +342,9 @@ func (tc *typechecker) getNestedFuncs(name string) []*ast.Func {
 //
 // For example:
 //
-//		if bad(node) {
-//			panic(tc.errorf(node, "bad node"))
-//		}
-//
+//	if bad(node) {
+//		panic(tc.errorf(node, "bad node"))
+//	}
 func (tc *typechecker) errorf(nodeOrPos interface{}, format string, args ...interface{}) error {
 	return checkError(tc.path, nodeOrPos, format, args...)
 }

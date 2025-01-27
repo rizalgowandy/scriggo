@@ -148,8 +148,7 @@ var commandsHelp = map[string]func(){
 // commands maps a command name to a function that executes that command.
 // Commands are called by command-line using:
 //
-//		scriggo command
-//
+//	scriggo command
 var commands = map[string]func(){
 	"bug": func() {
 		flag.Usage = commandsHelp["bug"]
@@ -239,6 +238,7 @@ var commands = map[string]func(){
 		flag.Usage = commandsHelp["serve"]
 		s := flag.Int("S", 0, "print assembly listing. n determines the length of Text instructions.")
 		metrics := flag.Bool("metrics", false, "print metrics about file executions.")
+		disableLiveReload := flag.Bool("disable-livereload", false, "disable LiveReload.")
 		flag.Parse()
 		asm := -2 // -2: no assembler
 		flag.Visit(func(f *flag.Flag) {
@@ -249,7 +249,7 @@ var commands = map[string]func(){
 				}
 			}
 		})
-		err := serve(asm, *metrics)
+		err := serve(asm, *metrics, *disableLiveReload)
 		if err != nil {
 			exitError("%s", err)
 		}
@@ -316,14 +316,13 @@ func version() string {
 
 // _import executes the sub commands "import":
 //
-//		scriggo import
-//
+//	scriggo import
 func _import(path string, flags buildFlags) (err error) {
 
 	_, err = exec.LookPath("go")
 	if err != nil {
 		return fmt.Errorf("scriggo: \"go\" executable file not found in $PATH\nIf not installed, " +
-			"download and install Go: https://golang.org/dl/\n")
+			"download and install Go: https://go.dev/dl/\n")
 	}
 
 	goos := os.Getenv("GOOS")
@@ -426,8 +425,7 @@ type buildFlags struct {
 
 // _init executes the sub commands "init":
 //
-//		scriggo init
-//
+//	scriggo init
 func _init(path string, flags buildFlags) error {
 
 	var err error
@@ -645,8 +643,17 @@ func execGoCommand(dir string, args ...string) (out io.Reader, err error) {
 // stdLibPaths returns a copy of stdlibPaths with the packages for the runtime
 // Go version.
 func stdLibPaths() []string {
-	paths := make([]string, len(stdlibPaths))
-	copy(paths, stdlibPaths)
+	version := goBaseVersion(runtime.Version())
+	paths := make([]string, 0, len(stdlibPaths))
+	for _, path := range stdlibPaths {
+		switch path {
+		case "structs", "unique":
+			if version != "go1.23" {
+				continue
+			}
+		}
+		paths = append(paths, path)
+	}
 	return paths
 }
 
@@ -672,7 +679,9 @@ var stdlibPaths = []string{
 	"crypto/cipher",
 	"crypto/des",
 	"crypto/dsa",
+	"crypto/ecdh",
 	"crypto/ecdsa",
+	"crypto/ed25519",
 	"crypto/elliptic",
 	"crypto/hmac",
 	"crypto/md5",
@@ -686,6 +695,7 @@ var stdlibPaths = []string{
 	"crypto/tls",
 	"crypto/x509",
 	"crypto/x509/pkix",
+	"debug/buildinfo",
 	"debug/dwarf",
 	"debug/elf",
 	"debug/gosym",
@@ -710,8 +720,10 @@ var stdlibPaths = []string{
 	"fmt",
 	"go/ast",
 	"go/build",
+	"go/build/constraint",
 	"go/constant",
 	"go/doc",
+	"go/doc/comment",
 	"go/format",
 	"go/importer",
 	"go/parser",
@@ -719,6 +731,7 @@ var stdlibPaths = []string{
 	"go/scanner",
 	"go/token",
 	"go/types",
+	"go/version",
 	"hash",
 	"hash/adler32",
 	"hash/crc32",
@@ -739,12 +752,15 @@ var stdlibPaths = []string{
 	"io/fs",
 	"io/ioutil",
 	"log",
+	"log/slog",
 	"log/syslog",
+	"maps",
 	"math",
 	"math/big",
 	"math/bits",
 	"math/cmplx",
 	"math/rand",
+	"math/rand/v2",
 	"mime",
 	"mime/multipart",
 	"mime/quotedprintable",
@@ -758,6 +774,7 @@ var stdlibPaths = []string{
 	"net/http/httputil",
 	"net/http/pprof",
 	"net/mail",
+	"net/netip",
 	"net/rpc",
 	"net/rpc/jsonrpc",
 	"net/smtp",
@@ -776,10 +793,13 @@ var stdlibPaths = []string{
 	"runtime/debug",
 	"runtime/metrics",
 	"runtime/pprof",
+	"runtime/race",
 	"runtime/trace",
+	"slices",
 	"sort",
 	"strconv",
 	"strings",
+	"structs", // Go version 1.23
 	"sync",
 	"sync/atomic",
 	"text/scanner",
@@ -791,4 +811,5 @@ var stdlibPaths = []string{
 	"unicode",
 	"unicode/utf16",
 	"unicode/utf8",
+	"unique", // Go version 1.23
 }

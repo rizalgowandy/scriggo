@@ -878,7 +878,7 @@ nodesLoop:
 
 		case ast.Expression:
 
-			// Handle function and macro declarations in scripts and templates.
+			// Handle function and macro declarations in templates.
 			if fun, ok := node.(*ast.Func); ok && fun.Ident != nil && tc.opts.mod != programMod {
 				if fun.Type.Macro && len(fun.Type.Result) == 0 {
 					tc.makeMacroResultExplicit(fun)
@@ -900,8 +900,7 @@ nodesLoop:
 					[]ast.Expression{fun},
 				)
 				// Check the new node, informing the type checker that the
-				// current assignment is a function declaration in a script
-				// or a macro declaration in a template.
+				// current assignment is a macro declaration in a template.
 				newNodes := []ast.Node{varDecl, nodeAssign}
 
 				_ = tc.checkNodes(newNodes)
@@ -943,9 +942,6 @@ nodesLoop:
 
 // checkImport type checks the import declaration.
 func (tc *typechecker) checkImport(impor *ast.Import) error {
-	if tc.opts.mod == scriptMod && impor.Tree != nil {
-		panic(internalError("native packages only can be imported in script"))
-	}
 
 	// Import a native package.
 	if impor.Tree == nil {
@@ -1070,7 +1066,7 @@ func (tc *typechecker) checkImport(impor *ast.Import) error {
 	case impor.Ident == nil:
 
 		// This form of import in templates has been transformed above, so just
-		// handle programs and scripts here.
+		// handle programs here.
 		tc.scopes.Declare(imported.Name, &typeInfo{value: imported, Properties: propertyIsPackage | propertyHasValue}, nil, impor)
 		return nil
 
@@ -1196,16 +1192,16 @@ func (tc *typechecker) checkFunc(node *ast.Func) {
 // expression list of the return statement; in this way, when checkReturn is
 // called, the tree can be changed from
 //
-//      func F() (a, b int) {
-//          return b, a
-//      }
+//	func F() (a, b int) {
+//	    return b, a
+//	}
 //
 // to
 //
-//      func F() (a, b int) {
-//          a, b = b, a
-//          return
-//      }
+//	func F() (a, b int) {
+//	    a, b = b, a
+//	    return
+//	}
 //
 // This simplifies the value swapping by handling it as a generic assignment.
 func (tc *typechecker) checkReturn(node *ast.Return) ast.Node {
@@ -1322,9 +1318,8 @@ func (tc *typechecker) checkReturn(node *ast.Return) ast.Node {
 // representing the declared type. If the type declaration has a blank
 // identifier as name, an empty string and a nil type info are returned.
 //
-//  type Int int
-//  type Int = int
-//
+//	type Int int
+//	type Int = int
 func (tc *typechecker) checkTypeDeclaration(node *ast.TypeDeclaration) (string, *typeInfo) {
 	typ := tc.checkType(node.Type)
 	if isBlankIdentifier(node.Ident) {

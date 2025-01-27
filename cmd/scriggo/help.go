@@ -195,7 +195,7 @@ Examples:
 `
 
 const helpServe = `
-usage: scriggo serve [-S n] [--metrics]
+usage: scriggo serve [-S n] [--metrics] [--disable-livereload]
 
 Serve runs a web server and serves the template rooted at the current
 directory. It is useful to learn Scriggo templates.
@@ -218,7 +218,8 @@ it renders 'blog/index.html' or 'blog/index.md'.
 Markdown is converted to HTML with the Goldmark parser with the options
 html.WithUnsafe, parser.WithAutoHeadingID and extension.GFM.
 
-Templates are automatically rebuilt when a file changes.
+When a file is modified, the server automatically rebuilds templates, and the
+browser reloads the page.
 
 The -S flag prints the assembly code of the served file and n determines the
 maximum length, in runes, of disassembled Text instructions
@@ -228,6 +229,9 @@ maximum length, in runes, of disassembled Text instructions
     n < 0: all text
 
 The --metrics flags prints metrics about execution time.
+
+The --disable-livereload flag disables LiveReload, preventing automatic page
+reloads in the browser.
 `
 
 const helpScriggofile = `
@@ -235,8 +239,8 @@ A Scriggofile is a file with a specific format used by the scriggo command.
 The scriggo command uses the instructions in a Scriggofile to initialize an
 interpreter or a Go source file used in an application that embeds Scriggo.
 
-A Scriggofile defines which packages an interpreted program and script can
-import, what exported declarations in a package are accessible and so on.
+A Scriggofile defines which packages an interpreted program can import, what
+exported declarations in a package are accessible and so on.
 
 The format of the Scriggofile is:
 
@@ -255,7 +259,7 @@ The instructions are:
     IMPORT STANDARD LIBRARY 
 
         Makes the packages in the Go standard library (almost all) importable
-        in a program or script executed by the interpreter.
+        in a program executed by the interpreter.
 
         To view all packages imported run 'scriggo stdlib'.
 
@@ -292,7 +296,7 @@ The instructions are:
 
         As for 'IMPORT <package> AS main' but the exported names in the package
         will be imported not capitalized. For example a name 'FooFoo' declared
-        in the package will be imported in the script as 'fooFoo'.
+        in the package will be imported in a template file as 'fooFoo'.
 
     SET VARIABLE <name> 
 

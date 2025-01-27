@@ -133,12 +133,11 @@ type envTestCtxString string
 
 // TestEnvStringer tests these interfaces:
 //
-//  * EnvStringer
-//  * HTMLEnvStringer
-//  * CSSEnvStringer
-//  * JSEnvStringer
-//  * JSONEnvStringer
-//
+//   - EnvStringer
+//   - HTMLEnvStringer
+//   - CSSEnvStringer
+//   - JSEnvStringer
+//   - JSONEnvStringer
 func TestEnvStringer(t *testing.T) {
 	for name, cas := range envStringerCases {
 		t.Run(name, func(t *testing.T) {
@@ -168,6 +167,9 @@ func TestEnvStringer(t *testing.T) {
 			w := &bytes.Buffer{}
 			options := &scriggo.RunOptions{Context: ctx}
 			err = template.Run(w, nil, options)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if diff := cmp.Diff(cas.want, w.String()); diff != "" {
 				t.Fatalf("(-want, +got):\n%s", diff)
 			}

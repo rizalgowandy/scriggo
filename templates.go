@@ -80,17 +80,17 @@ var formatTypes = map[ast.Format]reflect.Type{
 // If fsys implements FormatFS, file formats are read with its Format method,
 // otherwise it depends on the file name extension
 //
-//   HTML       : .html
-//   CSS        : .css
-//   JavaScript : .js
-//   JSON       : .json
-//   Markdown   : .md .mkd .mkdn .mdown .markdown
-//   Text       : all other extensions
+//	HTML       : .html
+//	CSS        : .css
+//	JavaScript : .js
+//	JSON       : .json
+//	Markdown   : .md .mdx .mkd .mkdn .mdown .markdown
+//	Text       : all other extensions
 //
 // If the named file does not exist, BuildTemplate returns an error satisfying
 // errors.Is(err, fs.ErrNotExist).
 //
-// If a build error occurs, it returns a *BuildError.
+// If a build error occurs, it returns a [*BuildError].
 func BuildTemplate(fsys fs.FS, name string, options *BuildOptions) (*Template, error) {
 	if f, ok := fsys.(FormatFS); ok {
 		fsys = formatFS{f}
@@ -104,7 +104,6 @@ func BuildTemplate(fsys fs.FS, name string, options *BuildOptions) (*Template, e
 		co.TreeTransformer = options.TreeTransformer
 		co.AllowGoStmt = options.AllowGoStmt
 		co.NoParseShortShowStmt = options.NoParseShortShowStmt
-		co.DollarIdentifier = options.DollarIdentifier
 		co.Importer = options.Packages
 		co.MDConverter = compiler.Converter(options.MarkdownConverter)
 		conv = options.MarkdownConverter
@@ -124,7 +123,7 @@ func BuildTemplate(fsys fs.FS, name string, options *BuildOptions) (*Template, e
 // multiple goroutines.
 //
 // If the executed template panics, and it is not recovered, Run returns a
-// *PanicError.
+// [*PanicError].
 //
 // If the Stop method of native.Env is called, Run returns the argument passed
 // to Stop.
@@ -166,10 +165,9 @@ func (t *Template) Run(out io.Writer, vars map[string]interface{}, options *RunO
 //
 // n determines the maximum length, in runes, of a disassembled text:
 //
-//   n > 0: at most n runes; leading and trailing white space are removed
-//   n == 0: no text
-//   n < 0: all text
-//
+//	n > 0: at most n runes; leading and trailing white space are removed
+//	n == 0: no text
+//	n < 0: all text
 func (t *Template) Disassemble(n int) []byte {
 	assemblies := compiler.Disassemble(t.fn, t.globals, n)
 	return assemblies["main"]
@@ -216,7 +214,7 @@ func initGlobalVariables(variables []compiler.Global, init map[string]interface{
 				} else {
 					if typ.Kind() != reflect.Ptr || typ.Elem() != variable.Type {
 						panic(fmt.Sprintf("variable initializer %q must have type %s or %s, but have %s",
-							variable.Name, variable.Type, reflect.PtrTo(variable.Type), typ))
+							variable.Name, variable.Type, reflect.PointerTo(variable.Type), typ))
 					}
 					if val.IsNil() {
 						panic(fmt.Sprintf("variable initializer %q cannot be a nil pointer", variable.Name))

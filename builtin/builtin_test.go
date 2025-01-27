@@ -116,6 +116,19 @@ var tests = []struct {
 	{Md5(``), "d41d8cd98f00b204e9800998ecf8427e"},
 	{Md5(`hello world!`), "fc3ff98e8c6a0d3087d515c0473f8677"},
 
+	// hasPrefix
+	{sp(HasPrefix("hello, world", "hello, ")), "true"},
+	{sp(HasPrefix("hello, world", "hello!")), "false"},
+	{sp(HasPrefix("", "hello!")), "false"},
+	{sp(HasPrefix("", "")), "true"},
+	{sp(HasPrefix("abc", "")), "true"},
+
+	// hasSuffix
+	{sp(HasSuffix("hello, world", ", world")), "true"},
+	{sp(HasSuffix("hello, world", "hello")), "false"},
+	{sp(HasSuffix("", "hello")), "false"},
+	{sp(HasSuffix("abc", "")), "true"},
+
 	// hex
 	{Hex(``), ""},
 	{Hex(`hello world!`), "68656c6c6f20776f726c6421"},
@@ -132,6 +145,23 @@ var tests = []struct {
 	{HmacSHA256(``, `secret`), "+eZuF5tnR65UEI+C+K3os8Jddv0wr95sOVgixTAZYWk="},
 	{HmacSHA256(`hello world!`, `secret`), "cgaXMb8pG0Y67LIYvCJ6vOPUA9dtpn+u8tSNPLQ7L1Q="},
 
+	// indexAny
+	{sp(IndexAny("hello", "h")), "0"},
+	{sp(IndexAny("hello", "j")), "-1"},
+	{sp(IndexAny("aaaba", "b")), "3"},
+	{sp(IndexAny("-aaaba", "a")), "1"},
+	{sp(IndexAny("-aaèba", "è")), "3"},
+	{sp(IndexAny("-ààèba", "è")), "5"},
+
+	// join
+	{sp(Join([]string{"a", "b", "c"}, " ")), "a b c"},
+	{sp(Join([]string{"a", "b", "c"}, "")), "abc"},
+	{sp(Join([]string{"ab", "cd", "ef"}, "\n")), "ab\ncd\nef"},
+	{sp(Join([]string{}, "")), ""},
+	{sp(Join([]string{}, "something")), ""},
+	{sp(Join([]string(nil), "")), ""},
+	{sp(Join([]string(nil), "something")), ""},
+
 	// marshalJSON
 	{(func() string { s, _ := MarshalJSON(nil); return string(s) })(), "null"},
 	{(func() string { s, _ := MarshalJSON(5); return string(s) })(), "5"},
@@ -141,6 +171,11 @@ var tests = []struct {
 	{(func() string { s, _ := MarshalJSONIndent(nil, "", ""); return string(s) })(), "null"},
 	{(func() string { s, _ := MarshalJSONIndent(5, " ", "\t"); return string(s) })(), "5"},
 	{(func() string { s, _ := MarshalJSONIndent([]string{"red", "green"}, "\t", "  "); return string(s) })(), "[\n\t  \"red\",\n\t  \"green\"\n\t]"},
+
+	// marshalYAML
+	{(func() string { s, _ := MarshalYAML(nil); return s })(), "null\n"},
+	{(func() string { s, _ := MarshalYAML(5); return s })(), "5\n"},
+	{(func() string { s, _ := MarshalYAML([]string{"red", "green"}); return s })(), "- red\n- green\n"},
 
 	// max
 	{spf("%d", Max(0, 0)), "0"},
@@ -167,6 +202,12 @@ var tests = []struct {
 		t2 := NewTime(time.Now())
 		return (t.Equal(t1) || t.After(t1)) && (t.Equal(t2) || t.Before(t2))
 	}()), "true"},
+
+	// parseDuration
+	{sp(ParseDuration("300ms")), "300ms <nil>"},
+	{sp(ParseDuration("1h20m")), "1h20m0s <nil>"},
+	{sp(ParseDuration(" 1h20m")), "0s parseDuration: invalid duration \" 1h20m\""},
+	{sp(ParseDuration(" 1h 20m")), "0s parseDuration: invalid duration \" 1h 20m\""},
 
 	// parseFloat
 	{sp(ParseFloat("")), "0 parseFloat: parsing \"\": invalid syntax"},
@@ -241,6 +282,12 @@ var tests = []struct {
 	{func() string { s := []bool{false, false, true}; Reverse(s); return spf("%v", s) }(), "[true false false]"},
 	{func() string { s := []native.HTML{`<b>`, `<a>`, `<c>`}; Reverse(s); return spf("%v", s) }(), "[<c> <a> <b>]"},
 
+	// runeCount
+	{sp(RuneCount("a")), "1"},
+	{sp(RuneCount("abc")), "3"},
+	{sp(RuneCount("")), "0"},
+	{sp(RuneCount("eè")), "2"},
+
 	// sha1
 	{Sha1(``), "da39a3ee5e6b4b0d3255bfef95601890afd80709"},
 	{Sha1(`hello world!`), "430ce34d020724ed75a196dfc2ad67c77772d169"},
@@ -259,9 +306,29 @@ var tests = []struct {
 	{func() string { s := []string{"a"}; Sort(s, nil); return spf("%v", s) }(), "[a]"},
 	{func() string { s := []string{"b", "a"}; Sort(s, nil); return spf("%v", s) }(), "[a b]"},
 	{func() string { s := []string{"b", "a", "c"}; Sort(s, nil); return spf("%v", s) }(), "[a b c]"},
+	{func() string { s := []rune{'b', 'a', 'c'}; Sort(s, nil); return spf("%v", s) }(), "[97 98 99]"},
 	{func() string { s := []bool{true, false, true}; Sort(s, nil); return spf("%v", s) }(), "[false true true]"},
 	{func() string { s := []native.HTML{`<b>`, `<a>`, `<c>`}; Sort(s, nil); return spf("%v", s) }(), "[<a> <b> <c>]"},
 	{func() string { s := []interface{}{5, 8, 2}; Sort(s, nil); return spf("%v", s) }(), "[2 5 8]"},
+
+	// split
+	{sp(Split("a b c", " ")), "[a b c]"},
+	{sp(Split("a-b-c", "-")), "[a b c]"},
+	{sp(Split("ax-bx-cx", " ")), "[ax-bx-cx]"},
+	{sp(Split("", "-")), "[]"},
+
+	// splitAfter
+	{sp(SplitAfter("a b c", " ")), "[a  b  c]"},
+	{sp(SplitAfter("a-b-c", "-")), "[a- b- c]"},
+	{sp(SplitAfter("ax-bx-cx", " ")), "[ax-bx-cx]"},
+	{sp(SplitAfter("", "-")), "[]"},
+
+	// sprint
+	{Sprint("x"), "x"},
+	{Sprint(10), "10"},
+	{Sprint(20, 30), "20 30"},
+	{Sprint(20, 30, 'f'), "20 30 102"},
+	{Sprint(), ""},
 
 	// toKebab
 	{ToKebab(""), ""},
@@ -307,6 +374,15 @@ var tests = []struct {
 	{spf("%v", UnmarshalJSON("", (*int)(nil))), "unmarshalJSON: cannot unmarshal into a nil pointer of type *int"},
 	{spf("%v", UnmarshalJSON("", []int{})), "unmarshalJSON: cannot unmarshal into non-pointer value of type []int"},
 	{spf("%v", UnmarshalJSON("5", &[]int{})), "unmarshalJSON: cannot unmarshal number into value of type []int"},
+
+	// unmarshalYAML
+	{spf("%#v", (func() interface{} { var v map[string]interface{}; _ = UnmarshalYAML("", &v); return v })()), "map[string]interface {}(nil)"},
+	{spf("%#v", (func() interface{} { var v map[string]interface{}; _ = UnmarshalYAML(`{"a":"b"}`, &v); return v })()), `map[string]interface {}{"a":"b"}`},
+	{spf("%#v", (func() interface{} { var v []int; _ = UnmarshalYAML("- 1\n- 2\n- 3\n", &v); return v })()), "[]int{1, 2, 3}"},
+	{spf("%v", UnmarshalYAML("", nil)), "unmarshalYAML: cannot unmarshal into nil"},
+	{spf("%v", UnmarshalYAML("", (*int)(nil))), "unmarshalYAML: cannot unmarshal into a nil pointer of type *int"},
+	{spf("%v", UnmarshalYAML("", []int{})), "unmarshalYAML: cannot unmarshal into non-pointer value of type []int"},
+	{spf("%v", UnmarshalYAML("5", &[]int{})), "unmarshalYAML: line 1: cannot unmarshal !!int `5` into []int"},
 
 	// unsafeconv
 	{string(toHTML("<a>")), "<a>"},

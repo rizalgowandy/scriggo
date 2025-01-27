@@ -51,6 +51,8 @@ func main() {
 	test17d()
 	test18()
 	test19()
+	// TODO: see the issue https://github.com/open2b/scriggo/issues/952, Go 1.20, about slice to array conversion.
+	// test20()
 
 }
 
@@ -312,4 +314,10 @@ func test19() {
 	defer recoverRuntimePanic("runtime error: hash of unhashable type []int")
 	m := map[interface{}]int{}
 	delete(m, []int{})
+}
+
+func test20() {
+	defer recoverRuntimePanic("runtime error: cannot convert slice with length 1 to pointer to array with length 2")
+	s := []int{1}
+	_ = (*[2]int)(s)
 }
